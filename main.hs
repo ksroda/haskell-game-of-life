@@ -3,6 +3,7 @@ import Control.Concurrent
 import Control.Monad.Trans
 import Control.Monad.Trans.State
 import System.Random (randomRIO)
+-- import Control.Parallel.Strategies
 
 data Cell = Live | Dead deriving (Eq)
 type Board = [[Cell]]
@@ -15,7 +16,7 @@ type Board = [[Cell]]
 
 instance Show Cell where
   show Live = "◼ "
-  show Dead = ". "
+  show Dead = "  "
 
 type Coords = (Int, Int)
 
@@ -77,15 +78,31 @@ evaluateBoard board = do
   map (\row -> map (evaluateCell board) row) $ getBoardCoords board
 
 
-gameOfLife :: StateT Board IO ()
-gameOfLife = do
-  prevBoard <- get
-  liftIO $ putStrLn "\ESC[2J"
-  liftIO $ drawBoard prevBoard
-  put $ evaluateBoard prevBoard
-  liftIO $ threadDelay 200000
-  gameOfLife
+gameOfLife :: Bool -> Int -> StateT Board IO ()
+gameOfLife isGameMode iterations
+  | iterations == 0 = return ()
+  | otherwise = do
+      prevBoard <- get
+      if isGameMode then do
+        liftIO $ putStrLn "\ESC[2J"
+        liftIO $ drawBoard prevBoard
+        liftIO $ threadDelay 200000
+      else return ()
+      put $ evaluateBoard prevBoard
+      gameOfLife isGameMode (iterations - 1)
+
+runGameMode :: Int -> Int -> IO ((), Board)
+runGameMode boardSize iterations = do
+  initBoard <- createRandomBoard boardSize
+  runStateT (gameOfLife True iterations) initBoard
+
+runCalculateFinalMode :: Int -> Int -> IO ((), Board)
+runCalculateFinalMode boardSize iterations = do
+  initBoard <- createRandomBoard boardSize
+  runStateT (gameOfLife False iterations) initBoard
 
 main = do
-  initBoard <- createRandomBoard 20
-  runStateT gameOfLife initBoard
+  -- runGameMode 20 100
+
+  result <- runCalculateFinalMode 20 1000
+  drawBoard $ snd result
