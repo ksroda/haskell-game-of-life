@@ -3,7 +3,7 @@ import Control.Concurrent
 import Control.Monad.Trans
 import Control.Monad.Trans.State
 import System.Random (randomRIO)
--- import Control.Parallel.Strategies
+import Control.Parallel.Strategies
 
 data Cell = Live | Dead deriving (Eq)
 type Board = [[Cell]]
@@ -71,11 +71,11 @@ evaluateCell board coords = do
 
 getBoardCoords :: Board -> [[Coords]]
 getBoardCoords board = map (\(i, row) -> map (\(j, _) -> (i,j))
-                                          $ zip [0..] row) $ zip [0..] board
+                                          $ zip [0..] row) (zip [0..] board) `using` parList rpar
 
 evaluateBoard :: Board -> Board
 evaluateBoard board = do
-  map (\row -> map (evaluateCell board) row) $ getBoardCoords board
+  map (\row -> map (evaluateCell board) row `using` parList rpar) (getBoardCoords board) `using` parList rpar
 
 
 gameOfLife :: Bool -> Int -> StateT Board IO ()
@@ -102,7 +102,15 @@ runCalculateFinalMode boardSize iterations = do
   runStateT (gameOfLife False iterations) initBoard
 
 main = do
-  -- runGameMode 20 100
+  -- Choose mode:
 
-  result <- runCalculateFinalMode 20 1000
+  -- result <- runGameMode 20 50
+  result <- runCalculateFinalMode 20 5000
+
+
   drawBoard $ snd result
+
+-- ----------------------------------------------------------
+--  ghc -threaded -eventlog -rtsopts --make main.hs
+-- ./main +RTS -ls -N4
+-- threadscope main.eventlog
